@@ -285,7 +285,7 @@ namespace LiveryKit.Mcp
             bool Replaces(LiveryRequest q) => job.Car.Liveries.Any(l => string.Equals(l.ModelName, q.ModelName, StringComparison.OrdinalIgnoreCase));
             string news = string.Join(", ", job.Liveries.Where(q => !Replaces(q)).Select(q => q.ModelName + ".yft"));
             string replaced = string.Join(", ", job.Liveries.Where(Replaces).Select(q => q.ModelName + ".yft"));
-            string text = $"An AI app wants to put {job.Liveries.Count} liveries into {job.Car.DisplayName}:\n{job.Car.ResourceRoot}\n\n" +
+            string text = $"An AI app wants to put {job.Liveries.Count} {(job.Liveries.Count == 1 ? "livery" : "liveries")} into {job.Car.DisplayName}:\n{job.Car.ResourceRoot}\n\n" +
                 (news.Length > 0 ? "New: " + news + "\n" : "") + (replaced.Length > 0 ? "Replaced: " + replaced + "\n" : "") +
                 $"\nEvery file it changes is backed up first to:\n{Path.Combine(job.OutputFolder, "Backups")}\n\nAllow this?";
             // YESNO | ICONWARNING | DEFBUTTON2 (No) | SETFOREGROUND | TOPMOST
