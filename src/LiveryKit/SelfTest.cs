@@ -126,6 +126,60 @@ namespace LiveryKit
                 return a != null && a.ChildText("<a><b>1</b></c><d>2</a>", "b") == "1" && a.Child("d") != null;
             });
 
+            Check("json: readable output that parses back the same, compact and indented", () =>
+            {
+                const string text = "{\"a\":[1,2.5,true,null],\"b\":\"x & <y> \\\"q\\\" \\\\ \\n\",\"c\":{}}";
+                var v = Mcp.Json.Parse(text);
+                string pretty = Mcp.Json.Write(v, indented: true);
+                return Mcp.Json.Write(v) == text && Mcp.Json.Write(Mcp.Json.Parse(pretty)) == text && pretty.Contains("\n  \"a\": [\n    1,");
+            });
+
+            Check("mcp settings: adds the server, keeps the rest, removes it again", () =>
+            {
+                const string cfg = "{\r\n  \"preferences\": {\"x\": 1},\r\n  \"mcpServers\": {\"other\": {\"command\": \"npx\", \"args\": [\"a&b\"]}}\r\n}";
+                var entry = new Dictionary<string, object> { ["command"] = @"C:\Tools\YftLiveryMaker.exe", ["args"] = new object[] { "--mcp" } };
+                string added = Mcp.McpServer.Register(cfg, "mcpServers", entry);
+                var servers = (Dictionary<string, object>)((Dictionary<string, object>)Mcp.Json.Parse(added))["mcpServers"];
+                string removed = Mcp.McpServer.Register(added, "mcpServers", null);
+                return added.Contains("\r\n") && added.Contains("\"a&b\"") && servers.Keys.SequenceEqual(new[] { "other", Mcp.McpServer.Name })
+                       && (string)Mcp.McpServer.Registered(added, "mcpServers")["command"] == @"C:\Tools\YftLiveryMaker.exe"
+                       && Mcp.McpServer.Register(added, "mcpServers", entry) == null
+                       && Mcp.McpServer.Registered(removed, "mcpServers") == null
+                       && Mcp.Json.Write(Mcp.Json.Parse(removed)) == Mcp.Json.Write(Mcp.Json.Parse(cfg))
+                       && Mcp.McpServer.Register(removed, "mcpServers", null) == null
+                       && Mcp.McpServer.Register("", "servers", entry).StartsWith("{\n  \"servers\": {");
+            });
+
+            Check("mcp settings: leaves files it can't read alone", () =>
+            {
+                bool Throws(string json)
+                {
+                    try { Mcp.McpServer.Register(json, "mcpServers", new Dictionary<string, object>()); return false; }
+                    catch (Exception) { return true; }
+                }
+                return Throws("// comment\n{}") && Throws("[1]") && Throws("{\"mcpServers\": []}");
+            });
+
+            Check("mcp: handshake, tool list and errors", () =>
+            {
+                string Ask(string json) => Mcp.McpServer.Handle(json);
+                var init = (Dictionary<string, object>)Mcp.Json.Parse(Ask("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"t\",\"version\":\"1\"}}}"));
+                var result = (Dictionary<string, object>)init["result"];
+                var list = (Dictionary<string, object>)((Dictionary<string, object>)Mcp.Json.Parse(Ask("{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"tools/list\"}")))["result"];
+                var tools = ((object[])list["tools"]).Cast<Dictionary<string, object>>().Select(t => (string)t["name"]);
+                string relative = Ask("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"find_cars\",\"arguments\":{\"folder\":\"cars\\\\mycar\"}}}");
+                return (int)init["id"] == 1 && (string)result["protocolVersion"] == "2025-06-18"
+                       && (string)((Dictionary<string, object>)result["serverInfo"])["name"] == Mcp.McpServer.Name
+                       && tools.SequenceEqual(new[] { "find_cars", "make_liveries" })
+                       && relative.Contains("\"isError\":true") && relative.Contains("full Windows path")
+                       && Ask("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}") == null
+                       && Ask("{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"ping\"}") == "{\"jsonrpc\":\"2.0\",\"id\":4,\"result\":{}}"
+                       && Ask("{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"nope\"}}").Contains("-32602")
+                       && Ask("{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"resources/list\"}").Contains("-32601")
+                       && Ask("{not json").Contains("-32700")
+                       && Ask("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"1999-01-01\"}}").Contains("\"protocolVersion\":\"2025-11-25\"");
+            });
+
             return results;
         }
     }

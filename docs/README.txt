@@ -81,6 +81,25 @@ GOOD TO KNOW
   The output is the same kind as the file it copies.
 
 
+AI APPS (optional)
+------------------
+Turn on "AI apps" at the top of the window to add YFT Livery Maker to the AI
+apps on this PC that support MCP: Claude Desktop, Cursor, Windsurf, VS Code
+and LM Studio. Restart the AI app, then ask it, for example:
+
+  Make a livery for the car in D:\server\resources\[cars]\mycar from
+  C:\Users\me\Desktop\livery.png
+
+The AI app starts YFT Livery Maker in the background when it needs it. It
+starts it from where it was when you turned the switch on, so keep
+YftLiveryMaker.exe in a folder you won't delete. If you move it, turn the
+switch on again. Turning it off removes it from the AI apps again.
+
+By hand ("Copy setup" in the switch's window copies both):
+  Claude Code:  claude mcp add --scope user yft-livery-maker -- "<path to YftLiveryMaker.exe>" --mcp
+  Other apps:   an MCP server that runs "<path to YftLiveryMaker.exe>" --mcp
+
+
 COMMAND LINE (optional)
 -----------------------
 yftlivery.exe does the same job in batch:
@@ -93,7 +112,7 @@ yftlivery.exe does the same job in batch:
 
 Other commands: inspect (show what's inside a .yft), extract (embedded
 textures to .dds), dds (image to .dds), decode (image or .dds to .png),
-selftest.
+mcp (the AI apps server), selftest.
 
 
 LICENCE

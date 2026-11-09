@@ -18,6 +18,8 @@
     <Reference Include="PresentationCore" />
     <Reference Include="WindowsBase" />
     <Reference Include="System.Xaml" />
+    <!-- JavaScriptSerializer, for the MCP server's JSON. -->
+    <Reference Include="System.Web.Extensions" />
   </ItemGroup>
 
   <ItemGroup>

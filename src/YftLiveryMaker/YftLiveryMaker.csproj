@@ -12,7 +12,7 @@
     <Nullable>disable</Nullable>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>YFT Livery Maker</Product>
     <Description>Turns livery artwork into GTA V / FiveM livery .yft files.</Description>
     <Copyright>Copyright (c) 2026 JustBlueDolphin. MIT licence. Uses CodeWalker.Core (dexyfex), SharpDX and DirectXTex tables (Microsoft).</Copyright>

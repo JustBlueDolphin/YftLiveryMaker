@@ -45,6 +45,18 @@ namespace LiveryKit
         public string TemplatePath { get; set; }
     }
 
+    /// <summary>One image for <see cref="LiveryMaker.Plan"/>: a new livery, or a replacement when Replace names one of the car's.</summary>
+    public sealed class LiveryWish
+    {
+        public string ImagePath { get; set; }
+        /// <summary>Mod shop name. Default: a replaced livery keeps its name, a new one is named after the image file.</summary>
+        public string DisplayName { get; set; }
+        /// <summary>Model name of the car's livery to replace.</summary>
+        public string Replace { get; set; }
+        /// <summary>Model name for a new livery instead of the next free number (one of the car's own names replaces it).</summary>
+        public string FileName { get; set; }
+    }
+
     public sealed class MakeJob
     {
         public CarInfo Car { get; set; }
@@ -92,6 +104,117 @@ namespace LiveryKit
     /// <summary>Runs a whole job: artwork -> DDS (with mipmaps) -> livery .yft -> carcols.meta / names script.</summary>
     public static class LiveryMaker
     {
+        /// <summary>
+        /// Plans a job the way the app does: finds the car (by name, or the one the path points at), its template livery
+        /// and naming, then makes each image a new livery or a replacement. Texture settings stay at their defaults.
+        /// </summary>
+        public static MakeJob Plan(string carPath, string carName, IEnumerable<LiveryWish> wishes, string outputFolder, bool install, string templateModel = null)
+        {
+            var scan = CarScanner.Scan(carPath);
+            var car = FindCar(scan, carName);
+            var tfile = templateModel != null ? Livery(car, templateModel) : TemplateFor(scan, car);
+            if (tfile == null || !tfile.Usable)
+                throw new LiveryException(templateModel != null
+                    ? $"{templateModel} isn't one of {car.DisplayName}'s liveries that can be opened."
+                    : $"{car.DisplayName} has no livery .yft that can be opened (missing or escrow-locked).");
+
+            var template = LiveryTemplate.Load(tfile.YftPath);
+            var naming = Naming.For(car, tfile, scan.AllYftNames);
+            var job = new MakeJob
+            {
+                Car = car,
+                Template = template,
+                TextureHash = (template.Suggested ?? throw new LiveryException($"{tfile.ModelName}.yft has no embedded livery texture.")).NameHash,
+                OutputFolder = outputFolder,
+                Mode = install ? OutputMode.InstallIntoResource : OutputMode.ExportToFolder,
+                LiteralLabels = naming.LiteralLabels,
+                TemplateLabel = naming.TemplateLabel,
+                TakenYftNames = scan.AllYftNames,
+            };
+
+            int auto = 0, labelIndex = 0;
+            foreach (var w in wishes)
+            {
+                string replace = !string.IsNullOrWhiteSpace(w.Replace) ? w.Replace : Livery(car, w.FileName) != null ? w.FileName : null;
+                if (replace != null)
+                {
+                    var old = Livery(car, replace) ?? throw new LiveryException($"{replace.Trim()} isn't one of {car.DisplayName}'s liveries.");
+                    string display = FirstText(w.DisplayName, old.LabelText, old.Label, old.ModelName);
+                    job.Liveries.Add(new LiveryRequest
+                    {
+                        ImagePath = w.ImagePath,
+                        ModelName = old.ModelName,
+                        DisplayName = display,
+                        Label = naming.LiteralLabels ? display : old.Label ?? old.ModelName.ToUpperInvariant(),
+                        // Built from the livery it replaces, so it keeps that exact model.
+                        TemplatePath = old.Usable ? old.YftPath : null,
+                    });
+                }
+                else
+                {
+                    string display = FirstText(w.DisplayName, PrettyName(w.ImagePath));
+                    job.Liveries.Add(new LiveryRequest
+                    {
+                        ImagePath = w.ImagePath,
+                        ModelName = string.IsNullOrWhiteSpace(w.FileName) ? naming.ModelName(auto++) : w.FileName.Trim(),
+                        DisplayName = display,
+                        Label = naming.Label(labelIndex++, display),
+                    });
+                }
+            }
+            return job;
+        }
+
+        /// <summary>The car called <paramref name="name"/> (exact, then partial match), or the one the scan points at.</summary>
+        public static CarInfo FindCar(ScanResult scan, string name)
+        {
+            string cars = string.Join(", ", scan.Cars.Take(40).Select(c => c.DisplayName)) + (scan.Cars.Count > 40 ? $" and {scan.Cars.Count - 40} more" : "");
+            if (scan.Cars.Count == 0)
+                throw new LiveryException($"No cars with YFT liveries found in {scan.ScannedFolder}. {string.Join(" ", scan.Warnings)}".TrimEnd());
+            if (string.IsNullOrWhiteSpace(name))
+                return scan.Preferred ?? (scan.Cars.Count == 1 ? scan.Cars[0]
+                    : throw new LiveryException($"Which car? {scan.ScannedFolder} has {scan.Cars.Count} cars with YFT liveries: {cars}."));
+            name = name.Trim();
+            return scan.Cars.Find(c => string.Equals(c.DisplayName, name, StringComparison.OrdinalIgnoreCase) || c.SpawnNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+                   ?? scan.Cars.Find(c => c.DisplayName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
+                   ?? throw new LiveryException($"No car called '{name}' in {scan.ScannedFolder}. Cars with YFT liveries: {cars}.");
+        }
+
+        /// <summary>The livery new ones are built from: the one the user pointed at, else the car's first usable one.</summary>
+        public static LiveryFile TemplateFor(ScanResult scan, CarInfo car) =>
+            scan.PreferredLivery != null && ReferenceEquals(car, scan.Preferred) ? scan.PreferredLivery : car.DefaultTemplate;
+
+        /// <summary>"keep", "1024", "2048", "4096", anything else matches the car's livery.</summary>
+        public static TextureSizeMode SizeFrom(string text)
+        {
+            switch ((text ?? "").Trim().ToLowerInvariant())
+            {
+                case "keep": return TextureSizeMode.KeepImage;
+                case "1024": return TextureSizeMode.Longest1024;
+                case "2048": return TextureSizeMode.Longest2048;
+                case "4096": return TextureSizeMode.Longest4096;
+                default: return TextureSizeMode.MatchOriginal;
+            }
+        }
+
+        /// <summary>"red_stripes-v2.png" -> "Red Stripes V2".</summary>
+        public static string PrettyName(string path)
+        {
+            var words = Path.GetFileNameWithoutExtension(path ?? "").Replace('_', ' ').Replace('-', ' ').Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < words.Length; i++) words[i] = char.ToUpperInvariant(words[i][0]) + words[i].Substring(1);
+            return string.Join(" ", words);
+        }
+
+        static LiveryFile Livery(CarInfo car, string model)
+        {
+            if (string.IsNullOrWhiteSpace(model)) return null;
+            model = model.Trim();
+            if (model.EndsWith(".yft", StringComparison.OrdinalIgnoreCase)) model = model.Substring(0, model.Length - 4);
+            return car.Liveries.Find(l => string.Equals(l.ModelName, model, StringComparison.OrdinalIgnoreCase));
+        }
+
+        static string FirstText(params string[] options) => options.FirstOrDefault(o => !string.IsNullOrWhiteSpace(o))?.Trim();
+
         public static MakeResult Run(MakeJob job, Action<double, string> progress = null, CancellationToken cancel = default)
         {
             Validate(job);

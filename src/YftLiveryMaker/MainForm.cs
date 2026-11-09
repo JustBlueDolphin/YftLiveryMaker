@@ -57,6 +57,8 @@ namespace YftLiveryMaker
         // ------------------------------------------------------------ controls
         Panel header, footer;
         TableLayoutPanel body;
+        ToggleSwitch aiSwitch;
+        bool aiSwitchQuiet;
         Label title, subtitle, carInfo, textureInfo, mipInfo, sizeInfo, statusLabel, outputHint, dropHint, previewCaption, listHint;
         readonly List<Label> mutedLabels = new List<Label>();
         readonly List<Card> cards = new List<Card>();
@@ -104,6 +106,7 @@ namespace YftLiveryMaker
             DragDrop += OnDragDrop;
             FormClosing += (s, e) => cts?.Cancel();
             LoadSettings();
+            SetAiSwitch(AiApps.IsOn());
             ApplyTheme();
             UpdateAll();
         }
@@ -158,8 +161,15 @@ namespace YftLiveryMaker
                 Settings.Set("theme", themeSwitch.SelectedIndex == 0 ? "dark" : "light");
                 ApplyTheme();
             };
-            header.Controls.AddRange(new Control[] { title, subtitle, themeSwitch });
-            header.Resize += (s, e) => themeSwitch.Location = new Point(header.Width - header.Padding.Right - themeSwitch.Width, (header.Height - themeSwitch.Height) / 2);
+            // Lets AI apps (Claude Desktop, Cursor, ...) make liveries with this program, over MCP.
+            aiSwitch = new ToggleSwitch { Text = "AI apps", Margin = new Padding(0), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            aiSwitch.CheckedChanged += (s, e) => OnAiSwitchChanged();
+            header.Controls.AddRange(new Control[] { title, subtitle, themeSwitch, aiSwitch });
+            header.Resize += (s, e) =>
+            {
+                themeSwitch.Location = new Point(header.Width - header.Padding.Right - themeSwitch.Width, (header.Height - themeSwitch.Height) / 2);
+                aiSwitch.Location = new Point(themeSwitch.Left - aiSwitch.Width - 24, (header.Height - aiSwitch.Height) / 2);
+            };
 
             footer = BuildFooter();
 
@@ -1622,6 +1632,77 @@ namespace YftLiveryMaker
             return d;
         }
 
+        void SetAiSwitch(bool on)
+        {
+            aiSwitchQuiet = true;
+            aiSwitch.Checked = on;
+            aiSwitchQuiet = false;
+        }
+
+        void OnAiSwitchChanged()
+        {
+            if (aiSwitchQuiet) return;
+            bool on = aiSwitch.Checked;
+            if (on)
+            {
+                using (var d = BuildAiDialog())
+                {
+                    if (d.ShowDialog(this) != DialogResult.OK)
+                    {
+                        SetAiSwitch(false);
+                        return;
+                    }
+                }
+            }
+
+            var (done, failed) = AiApps.Set(on);
+            SetAiSwitch(AiApps.IsOn());
+            string apps = done.Count <= 1 ? done.FirstOrDefault() : string.Join(", ", done.Take(done.Count - 1)) + " and " + done.Last();
+            if (on && done.Count > 0) Status($"AI apps: added to {apps}. Restart {(done.Count == 1 ? "it" : "them")}, then ask for a livery in the chat.", Tone.Good);
+            else if (!on) Status(done.Count > 0 ? $"AI apps: removed from {apps}." : "AI apps: off.", Tone.Normal);
+            if (failed.Count > 0) ThemedDialog.Show(this, "AI apps", DialogKind.Warning, "Some AI apps couldn't be changed", string.Join("\n\n", failed));
+        }
+
+        ThemedDialog BuildAiDialog()
+        {
+            if (AiApps.RunningFromTemp)
+            {
+                var t = new ThemedDialog("AI apps", DialogKind.Warning, "Unzip it first");
+                t.AddText("YFT Livery Maker is running from a temporary folder, probably straight from the zip, so AI apps would lose it when Windows clears that folder.");
+                t.AddText("Unzip it to a folder you'll keep (like Documents), start it from there and turn this on again.", muted: true);
+                t.AddButton("OK", DialogResult.Cancel, primary: true);
+                return t;
+            }
+
+            var apps = AiApps.Installed().Select(a => a.Name).Distinct().ToList();
+            var d = new ThemedDialog("AI apps", DialogKind.Question, apps.Count > 0 ? "Let AI apps make liveries for you?" : "No AI apps found", width: 520);
+            d.AddText("AI apps can then find your cars and make liveries with YFT Livery Maker when you ask them in the chat. They start it on this PC when they need it.");
+            if (apps.Count > 0)
+            {
+                d.AddText("Adds it to", muted: true);
+                d.AddBullets(apps);
+                d.AddText("Restart them, then ask something like", muted: true);
+            }
+            else
+            {
+                d.AddText("Claude Desktop, Cursor, Windsurf, VS Code and LM Studio aren't installed. Copy the setup into any app that supports MCP servers, then ask something like", muted: true);
+            }
+            d.AddPath(@"Make a livery for the car in D:\server\resources\[cars]\mycar from C:\Users\me\Desktop\livery.png");
+            d.AddText("For Claude Code, run", muted: true);
+            d.AddPath(AiApps.ClaudeCodeCommand);
+            d.AddAction("Copy setup", Glyphs.Copy, () =>
+            {
+                try { Clipboard.SetText(AiApps.SetupText); } catch { }
+            });
+            if (apps.Count > 0)
+            {
+                d.AddButton("Cancel", DialogResult.Cancel);
+                d.AddButton("Add", DialogResult.OK, primary: true);
+            }
+            else d.AddButton("OK", DialogResult.Cancel, primary: true);
+            return d;
+        }
+
         async Task ReloadAfterInstallAsync()
         {
             string carText = car?.DisplayName;
@@ -1768,6 +1849,9 @@ namespace YftLiveryMaker
                     d.AddInput("mycar_livery_30");
                     d.AddButton("Cancel", DialogResult.Cancel);
                     d.AddButton("Use this name", DialogResult.OK, primary: true);
+                    break;
+                case "ai":
+                    d = BuildAiDialog();
                     break;
                 case "warning":
                     d = BuildErrorDialog(new LiveryException("mycar_livery_7.yft is locked by FiveM Asset Escrow (encrypted), so no tool can open it. Pick one of the car's other livery .yft files that isn't escrowed."));
