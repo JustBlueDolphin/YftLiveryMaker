@@ -99,7 +99,11 @@ namespace YftLiveryMaker
                     if (text != null)
                     {
                         if (old.Length > 0) File.Copy(app.SettingsPath, app.SettingsPath + ".yftlivery.bak", true);
-                        File.WriteAllText(app.SettingsPath, text, new UTF8Encoding(false));
+                        // Write beside it and swap in, so a crash or full disk can't leave the app's settings empty.
+                        string tmp = app.SettingsPath + ".tmp";
+                        File.WriteAllText(tmp, text, new UTF8Encoding(false));
+                        if (File.Exists(app.SettingsPath)) File.Replace(tmp, app.SettingsPath, null);
+                        else File.Move(tmp, app.SettingsPath);
                     }
                     if (on || text != null) done.Add(app.Name);
                 }

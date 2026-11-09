@@ -31,7 +31,6 @@ namespace LiveryCli
                     case "dds": return MakeDds(args);
                     case "extract": return Extract(args);
                     case "decode": return Decode(args);
-                    case "build": return Build(args);
                     case "scan": return Scan(args);
                     case "togen9":
                         {
@@ -141,33 +140,6 @@ namespace LiveryCli
             foreach (var n in result.Notes) Console.WriteLine("  note: " + n);
             foreach (var w in result.Warnings) Console.WriteLine("  WARNING: " + w);
             Console.WriteLine("  instructions: " + result.InstructionsPath);
-            return 0;
-        }
-
-        static int Build(string[] args)
-        {
-            if (args.Length < 4) return Usage();
-            var opts = Options(args, 4);
-            var template = LiveryTemplate.Load(args[1]);
-            var target = template.Suggested ?? throw new Exception("template has no embedded texture");
-            Console.WriteLine($"template {template.ModelName}: livery texture {target} used by {string.Join(", ", target.UsedBy)}");
-
-            var img = ImageLoader.Load(args[2]);
-            if (img.Width != target.Width || img.Height != target.Height)
-            {
-                img = Resizer.Resize(img, target.Width, target.Height);
-                Console.WriteLine($"resized artwork to {img.Width}x{img.Height}");
-            }
-            var settings = new TextureSettings();
-            if (opts.TryGetValue("--format", out var f)) settings.Format = (LiveryTextureFormat)Enum.Parse(typeof(LiveryTextureFormat), f, true);
-            if (opts.TryGetValue("--mips", out var m)) settings.MipLevels = int.Parse(m);
-            var tex = TextureBuilder.Encode(img, settings);
-
-            string model = Path.GetFileNameWithoutExtension(args[3]);
-            var result = LiveryYftBuilder.Build(template, target.NameHash, tex.Dds, model);
-            File.WriteAllBytes(args[3], result.YftBytes);
-            Console.WriteLine($"wrote {args[3]} ({result.YftBytes.Length:N0} bytes)");
-            foreach (var c in result.Checks) Console.WriteLine("  verified: " + c);
             return 0;
         }
 

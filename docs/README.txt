@@ -95,6 +95,10 @@ starts it from where it was when you turned the switch on, so keep
 YftLiveryMaker.exe in a folder you won't delete. If you move it, turn the
 switch on again. Turning it off removes it from the AI apps again.
 
+Before an AI app writes straight into a car's resource, a Yes/No box asks you
+on this PC, so it can't change your server files without you. Making the
+liveries in a new folder (the default) needs no click.
+
 By hand ("Copy setup" in the switch's window copies both):
   Claude Code:  claude mcp add --scope user yft-livery-maker -- "<path to YftLiveryMaker.exe>" --mcp
   Other apps:   an MCP server that runs "<path to YftLiveryMaker.exe>" --mcp

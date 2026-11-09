@@ -48,6 +48,14 @@ function Install-Exe($source, $name) {
 
 Install-Exe "$root\src\YftLiveryMaker\bin\Release\net48\YftLiveryMaker.exe" 'YftLiveryMaker.exe'
 Install-Exe "$root\src\LiveryCli\bin\Release\net48\yftlivery.exe" 'yftlivery.exe'
+if (Get-Command python -ErrorAction SilentlyContinue) {
+    foreach ($server in @('yftlivery.exe mcp', 'YftLiveryMaker.exe --mcp')) {
+        $serverArgs = $server -split ' '
+        python -I "$root\tests\mcp_smoke.py" (Join-Path $dist $serverArgs[0]) $serverArgs[1]
+        if ($LASTEXITCODE -ne 0) { throw "MCP smoke test failed: $server" }
+    }
+} else { Write-Host 'Python not found: MCP smoke test skipped' }
+
 Copy-Item "$root\docs\README.txt" $dist -Force
 Copy-Item "$root\THIRD-PARTY-NOTICES.txt" $dist -Force
 Copy-Item "$root\LICENSE" "$dist\LICENSE.txt" -Force

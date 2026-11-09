@@ -93,6 +93,10 @@ The AI gets two tools:
 | `find_cars` | Lists the cars with YFT liveries in a folder, with each car's liveries, mod shop names and the next free livery name |
 | `make_liveries` | Makes liveries from images, new or replacing, the same way as the window: a new folder by default, or straight into the resource with backups |
 
+Writing straight into a car's resource first shows a Yes/No box on your PC, so an AI can't change your server
+files without you; the default (a new folder) needs no click. For unattended automation only, setting the
+environment variable `YFTLIVERY_NO_CONFIRM=1` for the server skips the box. Only do that if you accept the risk.
+
 It runs on your PC over stdin/stdout and opens no network port. Like anything else in the chat, what the tools
 return (car names, file paths) goes to the AI service your app uses.
 
@@ -125,6 +129,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 | `src/YftLiveryMaker` | The Windows app |
 | `src/LiveryCli` | The command-line tool |
 | `src/Shared` | Start-up code that makes each `.exe` a single file |
+| `tests` | MCP smoke test, run by `build.ps1` when Python is installed, plus a manual end-to-end script for real cars |
 | `third_party/CodeWalker` | [CodeWalker](https://github.com/dexyfex/CodeWalker) as a git submodule, used to read and write `.yft` files |
 
 ### Making a release

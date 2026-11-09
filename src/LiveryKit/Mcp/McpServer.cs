@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using LiveryKit.Resources;
 using LiveryKit.Textures;
@@ -48,7 +49,7 @@ namespace LiveryKit.Mcp
   {
     ""name"": ""make_liveries"",
     ""title"": ""Make liveries"",
-    ""description"": ""Turns livery images into GTA V / FiveM livery .yft files for a car. Each .yft is a copy of one of the car's own livery files with only the texture swapped (DXT5 with 10 mipmaps by default), and the carcols.meta mod kit entries and mod shop names are added too. Each image becomes a new livery, or replaces one of the car's liveries. By default everything goes in a new folder laid out like the car's resource, ready to copy over it; with install=true it is written straight into the car's resource, and every file it changes is backed up first. Images (PNG, PSD, TGA, JPG, BMP, TIFF or DDS) must be painted on the car's livery template."",
+    ""description"": ""Turns livery images into GTA V / FiveM livery .yft files for a car. Each .yft is a copy of one of the car's own livery files with only the texture swapped (DXT5 with 10 mipmaps by default), and the carcols.meta mod kit entries and mod shop names are added too. Each image becomes a new livery, or replaces one of the car's liveries. By default everything goes in a new folder laid out like the car's resource, ready to copy over it; with install=true it is written straight into the car's resource, and every file it changes is backed up first (install=true first asks the user with a Yes/No box on their PC, so only use it when they want that). Images (PNG, PSD, TGA, JPG, BMP, TIFF or DDS) must be painted on the car's livery template."",
     ""inputSchema"": {
       ""type"": ""object"",
       ""properties"": {
@@ -69,7 +70,7 @@ namespace LiveryKit.Mcp
             ""required"": [""image""]
           }
         },
-        ""install"": { ""type"": ""boolean"", ""description"": ""true: write straight into the car's resource (changed files are backed up). Default false: write a new folder to copy over the resource."" },
+        ""install"": { ""type"": ""boolean"", ""description"": ""true: write straight into the car's resource (changed files are backed up), after the user answers a Yes/No box on their PC. Default false: write a new folder to copy over the resource."" },
         ""output_folder"": { ""type"": ""string"", ""description"": ""Where the new folder goes (with install: the backups and .dds copies). Default: Documents\\YFT Livery Maker."" },
         ""format"": { ""type"": ""string"", ""enum"": [""DXT5"", ""DXT1"", ""BC7"", ""A8R8G8B8""], ""description"": ""Texture format. Default DXT5, which every GTA livery uses."" },
         ""mipmaps"": { ""type"": ""integer"", ""minimum"": 1, ""maximum"": 13, ""description"": ""Number of mipmaps. Default 10 (2048x2048 down to 4x4)."" },
@@ -255,6 +256,7 @@ namespace LiveryKit.Mcp
             if (Str(a, "size") is string size) job.SizeMode = LiveryMaker.SizeFrom(size);
             job.SaveDds = Bool(a, "save_dds", true);
 
+            ConfirmInstall(job);
             var sw = Stopwatch.StartNew();
             var r = LiveryMaker.Run(job);
             var sb = new StringBuilder();
@@ -271,6 +273,24 @@ namespace LiveryKit.Mcp
             AppendList(sb, "Next steps", r.NextSteps);
             if (r.InstructionsPath != null) sb.AppendLine("Full instructions: " + r.InstructionsPath);
             return sb.ToString().TrimEnd();
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
+
+        /// <summary>Writing into a resource needs a human's Yes, so a prompt-injected AI can't change server files alone.</summary>
+        static void ConfirmInstall(MakeJob job)
+        {
+            if (job.Mode != OutputMode.InstallIntoResource || Environment.GetEnvironmentVariable("YFTLIVERY_NO_CONFIRM") == "1") return;
+            bool Replaces(LiveryRequest q) => job.Car.Liveries.Any(l => string.Equals(l.ModelName, q.ModelName, StringComparison.OrdinalIgnoreCase));
+            string news = string.Join(", ", job.Liveries.Where(q => !Replaces(q)).Select(q => q.ModelName + ".yft"));
+            string replaced = string.Join(", ", job.Liveries.Where(Replaces).Select(q => q.ModelName + ".yft"));
+            string text = $"An AI app wants to put {job.Liveries.Count} liveries into {job.Car.DisplayName}:\n{job.Car.ResourceRoot}\n\n" +
+                (news.Length > 0 ? "New: " + news + "\n" : "") + (replaced.Length > 0 ? "Replaced: " + replaced + "\n" : "") +
+                $"\nEvery file it changes is backed up first to:\n{Path.Combine(job.OutputFolder, "Backups")}\n\nAllow this?";
+            // YESNO | ICONWARNING | DEFBUTTON2 (No) | SETFOREGROUND | TOPMOST
+            if (MessageBoxW(IntPtr.Zero, text, "YFT Livery Maker", 0x4 | 0x30 | 0x100 | 0x10000 | 0x40000) != 6)
+                throw new LiveryException("The user said no to writing into the car's resource. Ask them what they want, or make the liveries in a new folder instead (install=false).");
         }
 
         /// <summary>
