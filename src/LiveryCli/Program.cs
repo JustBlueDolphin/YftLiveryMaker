@@ -42,6 +42,9 @@ namespace LiveryCli
                             return 0;
                         }
                     case "make": return Make(args);
+                    case "mcp":
+                        LiveryKit.Mcp.McpServer.RunStdio();
+                        return 0;
                     case "selftest":
                         {
                             var results = SelfTest.Run();
@@ -71,6 +74,7 @@ namespace LiveryCli
             Console.WriteLine("  yftlivery make <car folder | livery.yft> <image> [image...] --out <folder> [--install] [--car text]");
             Console.WriteLine("                 [--replace mycar_livery_3=art.png]   (replace one of the car's liveries; repeatable)");
             Console.WriteLine("                 [--template model] [--format DXT5] [--mips 10] [--size match|keep|1024|2048|4096] [--no-dds]");
+            Console.WriteLine("  yftlivery mcp      (MCP server on stdin/stdout, for AI apps)");
             return 1;
         }
 
@@ -96,8 +100,9 @@ namespace LiveryCli
         static int Make(string[] args)
         {
             if (args.Length < 3) return Usage();
-            var images = new List<string>();
-            var replacements = new List<(string Model, string Image)>();
+            // Replacements first, then new liveries, each in the order given.
+            var wishes = new List<LiveryWish>();
+            var images = new List<LiveryWish>();
             var opts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             for (int i = 2; i < args.Length; i++)
             {
@@ -106,82 +111,27 @@ namespace LiveryCli
                     var pair = args[++i];
                     int eq = pair.IndexOf('=');
                     if (eq <= 0) throw new Exception("--replace needs model=image, e.g. --replace mycar_livery_3=art.png");
-                    replacements.Add((pair.Substring(0, eq), pair.Substring(eq + 1)));
+                    wishes.Add(new LiveryWish { Replace = pair.Substring(0, eq), ImagePath = pair.Substring(eq + 1) });
                 }
                 else if (args[i].StartsWith("--"))
                 {
                     if (args[i] == "--install" || args[i] == "--no-dds") opts[args[i]] = "";
                     else opts[args[i]] = args[++i];
                 }
-                else images.Add(args[i]);
+                else images.Add(new LiveryWish { ImagePath = args[i] });
             }
+            wishes.AddRange(images);
+            if (!opts.TryGetValue("--out", out var output)) throw new Exception("--out is required");
+            opts.TryGetValue("--car", out var carText);
+            opts.TryGetValue("--template", out var templateModel);
 
-            var scan = CarScanner.Scan(args[1]);
-            CarInfo car = scan.Preferred;
-            if (opts.TryGetValue("--car", out var carText))
-                car = scan.Cars.Find(c => c.DisplayName.IndexOf(carText, StringComparison.OrdinalIgnoreCase) >= 0);
-            if (car == null) throw new Exception("pick a car with --car (see 'scan')");
-
-            var tfile = scan.PreferredLivery != null && ReferenceEquals(car, scan.Preferred) ? scan.PreferredLivery : car.DefaultTemplate;
-            if (opts.TryGetValue("--template", out var tname)) tfile = car.Liveries.Find(l => string.Equals(l.ModelName, tname, StringComparison.OrdinalIgnoreCase));
-            if (tfile == null || !tfile.Usable) throw new Exception("no usable template livery for that car");
-
-            var template = LiveryTemplate.Load(tfile.YftPath);
-            var naming = LiveryKit.Resources.Naming.For(car, tfile, scan.AllYftNames);
-            var job = new MakeJob
-            {
-                Car = car,
-                Template = template,
-                TextureHash = template.Suggested.NameHash,
-                OutputFolder = opts.TryGetValue("--out", out var o) ? o : throw new Exception("--out is required"),
-                Mode = opts.ContainsKey("--install") ? OutputMode.InstallIntoResource : OutputMode.ExportToFolder,
-                SaveDds = !opts.ContainsKey("--no-dds"),
-                LiteralLabels = naming.LiteralLabels,
-                TemplateLabel = naming.TemplateLabel,
-                TakenYftNames = scan.AllYftNames,
-            };
+            var job = LiveryMaker.Plan(args[1], carText, wishes, output, opts.ContainsKey("--install"), templateModel);
+            job.SaveDds = !opts.ContainsKey("--no-dds");
             if (opts.TryGetValue("--format", out var f)) job.Texture.Format = (LiveryTextureFormat)Enum.Parse(typeof(LiveryTextureFormat), f, true);
             if (opts.TryGetValue("--mips", out var m)) job.Texture.MipLevels = int.Parse(m);
-            if (opts.TryGetValue("--size", out var size))
-            {
-                switch (size)
-                {
-                    case "keep": job.SizeMode = TextureSizeMode.KeepImage; break;
-                    case "1024": job.SizeMode = TextureSizeMode.Longest1024; break;
-                    case "2048": job.SizeMode = TextureSizeMode.Longest2048; break;
-                    case "4096": job.SizeMode = TextureSizeMode.Longest4096; break;
-                    default: job.SizeMode = TextureSizeMode.MatchOriginal; break;
-                }
-            }
+            if (opts.TryGetValue("--size", out var size)) job.SizeMode = LiveryMaker.SizeFrom(size);
 
-            foreach (var (model, image) in replacements)
-            {
-                var old = car.Liveries.Find(l => string.Equals(l.ModelName, model, StringComparison.OrdinalIgnoreCase))
-                          ?? throw new Exception($"{model} isn't one of {car.DisplayName}'s liveries (see 'scan')");
-                string display = PrettyName(image);
-                job.Liveries.Add(new LiveryRequest
-                {
-                    ImagePath = image,
-                    ModelName = old.ModelName,
-                    DisplayName = display,
-                    Label = naming.LiteralLabels ? display : old.Label ?? old.ModelName.ToUpperInvariant(),
-                    TemplatePath = old.Usable ? old.YftPath : null,
-                });
-            }
-
-            for (int i = 0; i < images.Count; i++)
-            {
-                string display = PrettyName(images[i]);
-                job.Liveries.Add(new LiveryRequest
-                {
-                    ImagePath = images[i],
-                    ModelName = naming.ModelName(i),
-                    DisplayName = display,
-                    Label = naming.Label(i, display),
-                });
-            }
-
-            Console.WriteLine($"car: {car}\ntemplate: {template.ModelName} texture {template.Suggested}");
+            Console.WriteLine($"car: {job.Car}\ntemplate: {job.Template.ModelName} texture {job.Template.Suggested}");
             var sw = Stopwatch.StartNew();
             string last = null;
             var result = LiveryMaker.Run(job, (p, s) => { if (s != last) { Console.WriteLine($"  {p,4:P0} {s}"); last = s; } });
@@ -192,13 +142,6 @@ namespace LiveryCli
             foreach (var w in result.Warnings) Console.WriteLine("  WARNING: " + w);
             Console.WriteLine("  instructions: " + result.InstructionsPath);
             return 0;
-        }
-
-        static string PrettyName(string path)
-        {
-            var words = Path.GetFileNameWithoutExtension(path).Replace('_', ' ').Replace('-', ' ').Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < words.Length; i++) words[i] = char.ToUpperInvariant(words[i][0]) + words[i].Substring(1);
-            return string.Join(" ", words);
         }
 
         static int Build(string[] args)

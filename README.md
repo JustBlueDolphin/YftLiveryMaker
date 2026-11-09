@@ -52,6 +52,50 @@ The program isn't code-signed, so Windows may say "Windows protected your PC" th
 - Dark mode is the default; the switch at the top right changes it.
 - The full user guide is [docs/README.txt](docs/README.txt), which is also in the zip.
 
+### Use it from AI apps
+
+Turn on **AI apps** at the top of the window and YFT Livery Maker adds itself to the AI apps on your PC that
+support MCP: Claude Desktop, Cursor, Windsurf, VS Code and LM Studio. Restart the AI app, then just ask it, for
+example:
+
+> Make a livery for the car in `D:\server\resources\[cars]\mycar` from `C:\Users\me\Desktop\livery.png`
+
+> Show me the liveries on my 811s2 in `D:\server\resources\[cars]`, then replace livery 3 with
+> `C:\art\police.png` and call it Police
+
+The AI app starts YFT Livery Maker in the background when it needs it, so the window doesn't have to be open.
+Turning the switch off removes it again. Only YFT Livery Maker's own entry in each AI app's settings changes, and
+the previous settings file is kept as `<name>.yftlivery.bak`.
+
+AI apps start the program from where it was when you turned the switch on, so keep `YftLiveryMaker.exe` in a
+folder you won't delete (not inside the zip). If you move it, turn the switch on again from the new place.
+
+To add it by hand (the **Copy setup** button in the switch's window copies both):
+
+- **Claude Code:** `claude mcp add --scope user yft-livery-maker -- "C:\path\to\YftLiveryMaker.exe" --mcp`
+- **Any other MCP app:** add a server that runs `"C:\path\to\YftLiveryMaker.exe" --mcp` (or `yftlivery.exe mcp`):
+
+  ```json
+  {
+    "mcpServers": {
+      "yft-livery-maker": {
+        "command": "C:\\path\\to\\YftLiveryMaker.exe",
+        "args": ["--mcp"]
+      }
+    }
+  }
+  ```
+
+The AI gets two tools:
+
+| Tool | What it does |
+| --- | --- |
+| `find_cars` | Lists the cars with YFT liveries in a folder, with each car's liveries, mod shop names and the next free livery name |
+| `make_liveries` | Makes liveries from images, new or replacing, the same way as the window: a new folder by default, or straight into the resource with backups |
+
+It runs on your PC over stdin/stdout and opens no network port. Like anything else in the chat, what the tools
+return (car names, file paths) goes to the AI service your app uses.
+
 ### Command line
 
 `yftlivery.exe` in the zip does the same job in batch. Run it with no arguments to see every option.

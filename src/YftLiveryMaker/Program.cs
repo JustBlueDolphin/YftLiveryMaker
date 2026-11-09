@@ -20,6 +20,13 @@ namespace YftLiveryMaker
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Run(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--mcp")
+            {
+                // How AI apps start it (see AiApps): no window, MCP over stdin/stdout.
+                LiveryKit.Mcp.McpServer.RunStdio();
+                return;
+            }
+
             // build.ps1 renames a running copy aside when updating; tidy those up once they've exited.
             try
             {
