@@ -155,7 +155,7 @@ namespace LiveryCli
                 if (texs == null) continue;
                 foreach (var t in texs)
                 {
-                    var path = Path.Combine(args[2], t.Name + ".dds");
+                    var path = Path.Combine(args[2], Path.GetFileName(t.Name) + ".dds"); // the name comes from the file: keep it inside the folder
                     File.WriteAllBytes(path, CodeWalker.Utils.DDSIO.GetDDSFile(t));
                     Console.WriteLine($"{path}  {t.Width}x{t.Height} {t.Format} mips:{t.Levels}");
                 }

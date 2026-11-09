@@ -113,6 +113,8 @@ namespace LiveryKit.Meta
                 else
                 {
                     stack.Add(span);
+                    // Callers walk the tree recursively; real .meta files are a dozen levels deep.
+                    if (stack.Count > 200) throw new LiveryException("The XML is nested too deeply to be a real .meta file.");
                 }
                 i = gt + 1;
             }

@@ -195,6 +195,12 @@ namespace LiveryKit
                        && LiveryMaker.FreeKitId(new HashSet<string>(), new Random(7)) == new Random(7).Next(4000, 9000).ToString();
             });
 
+            Check("xml spans: absurdly deep nesting is refused, not a stack overflow", () =>
+            {
+                try { XmlSpans.Parse(string.Concat(Enumerable.Repeat("<a>", 60000))); return false; }
+                catch (LiveryException) { return XmlSpans.Parse(string.Concat(Enumerable.Repeat("<a>", 150))) != null; }
+            });
+
             results.AddRange(EndToEndTest.Run());
             return results;
         }

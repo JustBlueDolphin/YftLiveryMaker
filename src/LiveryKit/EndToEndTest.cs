@@ -94,6 +94,19 @@ namespace LiveryKit
                            && File.Exists(r.InstructionsPath);
                 });
 
+                Check("e2e: replace a livery whose carcols label is empty", () =>
+                {
+                    string car4 = Path.Combine(root, "testcar4");
+                    CopyDir(car, car4);
+                    string meta = Path.Combine(car4, "data", "carcols.meta");
+                    File.WriteAllText(meta, File.ReadAllText(meta).Replace("<modShopLabel>TESTCAR_LIV1</modShopLabel>", "<modShopLabel />"));
+                    var job = LiveryMaker.Plan(car4, null, new[] { new LiveryWish { ImagePath = flag, Replace = "testcar_livery_1" } }, Path.Combine(root, "out4"), install: true);
+                    var r = LiveryMaker.Run(job);
+                    var kit = CarcolsReader.ReadKits(File.ReadAllText(meta), "x").Single();
+                    return r.Liveries.Single().Replaced && kit.Liveries.Single().Label == "TESTCAR_LIVERY_1"
+                           && Directory.GetFiles(Path.Combine(car4, "stream")).Length == 1;
+                });
+
                 Check("e2e: MCP find_cars and make_liveries", () =>
                 {
                     string car3 = Path.Combine(root, "testcar3");

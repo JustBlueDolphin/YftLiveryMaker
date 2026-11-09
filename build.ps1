@@ -48,7 +48,10 @@ function Install-Exe($source, $name) {
 
 Install-Exe "$root\src\YftLiveryMaker\bin\Release\net48\YftLiveryMaker.exe" 'YftLiveryMaker.exe'
 Install-Exe "$root\src\LiveryCli\bin\Release\net48\yftlivery.exe" 'yftlivery.exe'
-if (Get-Command python -ErrorAction SilentlyContinue) {
+# Windows ships a fake python.exe that only opens the Store, so check that it really runs.
+$hasPython = $false
+try { python -c "pass" 2>$null; $hasPython = $LASTEXITCODE -eq 0 } catch { }
+if ($hasPython) {
     foreach ($server in @('yftlivery.exe mcp', 'YftLiveryMaker.exe --mcp')) {
         $serverArgs = $server -split ' '
         python -I "$root\tests\mcp_smoke.py" (Join-Path $dist $serverArgs[0]) $serverArgs[1]

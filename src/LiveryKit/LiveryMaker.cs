@@ -148,7 +148,7 @@ namespace LiveryKit
                         ImagePath = w.ImagePath,
                         ModelName = old.ModelName,
                         DisplayName = display,
-                        Label = naming.LiteralLabels ? display : old.Label ?? old.ModelName.ToUpperInvariant(),
+                        Label = naming.LiteralLabels ? display : string.IsNullOrEmpty(old.Label) ? old.ModelName.ToUpperInvariant() : old.Label,
                         // Built from the livery it replaces, so it keeps that exact model.
                         TemplatePath = old.Usable ? old.YftPath : null,
                     });
@@ -264,8 +264,17 @@ namespace LiveryKit
                 Directory.CreateDirectory(Path.GetDirectoryName(dest));
                 string tmp = dest + ".tmp-" + Guid.NewGuid().ToString("N").Substring(0, 8);
                 File.WriteAllBytes(tmp, bytes);
-                if (File.Exists(dest)) File.Delete(dest);
-                File.Move(tmp, dest);
+                try
+                {
+                    if (File.Exists(dest)) File.Delete(dest);
+                    File.Move(tmp, dest);
+                }
+                catch
+                {
+                    // e.g. the old file is read-only or open: don't leave the temp file in the resource
+                    try { File.Delete(tmp); } catch { }
+                    throw;
+                }
                 result.Written.Add($"{what}: {dest}");
             }
 

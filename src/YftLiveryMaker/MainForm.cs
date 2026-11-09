@@ -1148,7 +1148,7 @@ namespace YftLiveryMaker
                 if (data.Replaces != null)
                 {
                     data.ModelName = data.Replaces.ModelName;
-                    label = naming.LiteralLabels ? display : (data.Replaces.Label ?? data.Replaces.ModelName.ToUpperInvariant());
+                    label = naming.LiteralLabels ? display : string.IsNullOrEmpty(data.Replaces.Label) ? data.Replaces.ModelName.ToUpperInvariant() : data.Replaces.Label;
                 }
                 else
                 {
