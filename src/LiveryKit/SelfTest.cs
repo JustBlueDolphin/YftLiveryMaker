@@ -195,6 +195,7 @@ namespace LiveryKit
                        && LiveryMaker.FreeKitId(new HashSet<string>(), new Random(7)) == new Random(7).Next(4000, 9000).ToString();
             });
 
+            results.AddRange(EndToEndTest.Run());
             return results;
         }
     }
