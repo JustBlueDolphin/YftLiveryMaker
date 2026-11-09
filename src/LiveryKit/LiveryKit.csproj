@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>LiveryKit</RootNamespace>
+    <AssemblyName>LiveryKit</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Official CodeWalker repository, as a git submodule; third_party/Directory.Build.targets trims it. -->
+    <ProjectReference Include="..\..\third_party\CodeWalker\CodeWalker.Core\CodeWalker.Core.csproj" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CodeWalker's list of shader names, so shaders show by name instead of hash. -->
+    <EmbeddedResource Include="..\..\third_party\CodeWalker\CodeWalker.Core\strings.txt" LogicalName="LiveryKit.strings.txt" Link="Resources\strings.txt" />
+  </ItemGroup>
+
+</Project>

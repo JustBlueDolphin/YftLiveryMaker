@@ -1,0 +1,4 @@
+[submodule "third_party/CodeWalker"]
+	path = third_party/CodeWalker
+	url = https://github.com/dexyfex/CodeWalker.git
+	shallow = true

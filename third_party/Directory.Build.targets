@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    MSBuild imports this automatically for the CodeWalker submodule's projects (it sits in a parent
+    folder), so CodeWalker's own files stay untouched.
+
+    CodeWalker.Core ships an FBX importer that contains GPL-licensed code (Hamish Milne's FbxWriter).
+    YFT Livery Maker never uses it, so it is left out of the build and out of the release binaries.
+  -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'CodeWalker.Core'">
+    <Compile Remove="Utils\Fbx.cs;Utils\FbxConverter.cs" />
+  </ItemGroup>
+</Project>

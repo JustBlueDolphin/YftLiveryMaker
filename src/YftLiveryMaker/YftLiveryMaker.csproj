@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>YftLiveryMaker</RootNamespace>
+    <AssemblyName>YftLiveryMaker</AssemblyName>
+    <Prefer32Bit>false</Prefer32Bit>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>disable</Nullable>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>1.0.0</Version>
+    <Product>YFT Livery Maker</Product>
+    <Description>Turns livery artwork into GTA V / FiveM livery .yft files.</Description>
+    <Copyright>Copyright (c) 2026 JustBlueDolphin. MIT licence. Uses CodeWalker.Core (dexyfex), SharpDX and DirectXTex tables (Microsoft).</Copyright>
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LiveryKit\LiveryKit.csproj" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
+  </ItemGroup>
+
+  <!-- Shared start-up code, and CodeWalker's gen9 shader table, which it reads from next to its DLL. -->
+  <ItemGroup>
+    <Compile Include="../Shared/EmbeddedAssemblies.cs" Link="EmbeddedAssemblies.cs" />
+    <EmbeddedResource Include="../../third_party/CodeWalker/CodeWalker.Core/ShadersGen9Conversion.xml" LogicalName="embedded.ShadersGen9Conversion.xml" />
+  </ItemGroup>
+
+  <!--
+    Single-file: every referenced .dll is embedded and unpacked on first use when it isn't
+    next to the .exe (see src/Shared/EmbeddedAssemblies.cs), so dist\YftLiveryMaker.exe runs on its own.
+  -->
+  <Target Name="EmbedReferencedAssemblies" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <EmbeddedResource Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'">
+        <LogicalName>embedded.%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+
+</Project>
