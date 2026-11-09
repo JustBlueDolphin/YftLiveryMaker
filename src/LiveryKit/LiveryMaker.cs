@@ -75,6 +75,8 @@ namespace LiveryKit
         public string TemplateLabel { get; set; }
         /// <summary>All .yft names in the scanned folder, to avoid clashes.</summary>
         public ICollection<string> TakenYftNames { get; set; }
+        /// <summary>All mod kit ids in the scanned folder, to avoid clashes.</summary>
+        public ICollection<string> TakenKitIds { get; set; }
     }
 
     public sealed class MadeLivery
@@ -130,6 +132,7 @@ namespace LiveryKit
                 LiteralLabels = naming.LiteralLabels,
                 TemplateLabel = naming.TemplateLabel,
                 TakenYftNames = scan.AllYftNames,
+                TakenKitIds = scan.KitIds,
             };
 
             int auto = 0, labelIndex = 0;
@@ -200,7 +203,7 @@ namespace LiveryKit
         /// <summary>"red_stripes-v2.png" -> "Red Stripes V2".</summary>
         public static string PrettyName(string path)
         {
-            var words = Path.GetFileNameWithoutExtension(path ?? "").Replace('_', ' ').Replace('-', ' ').Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var words = Path.GetFileNameWithoutExtension(path ?? "").Replace('_', ' ').Replace('-', ' ').Replace('.', ' ').Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < words.Length; i++) words[i] = char.ToUpperInvariant(words[i][0]) + words[i].Substring(1);
             return string.Join(" ", words);
         }
@@ -238,7 +241,7 @@ namespace LiveryKit
             string exportRoot = null, overlayRoot = null, backupRoot = null, ddsRoot;
             if (install)
             {
-                backupRoot = Path.Combine(job.OutputFolder, "Backups", $"{resourceName}_{stamp}");
+                backupRoot = UniqueFolder(Path.Combine(job.OutputFolder, "Backups", $"{resourceName}_{stamp}"));
                 ddsRoot = Path.Combine(job.OutputFolder, "DDS", carName);
                 result.OutputFolder = resourceRoot;
             }
@@ -367,7 +370,7 @@ namespace LiveryKit
             else
             {
                 // No mod kit to add to: hand over a ready kit the user wires up once.
-                string kitId = new Random().Next(4000, 9000).ToString();
+                string kitId = FreeKitId(job.TakenKitIds ?? new string[0], new Random());
                 string kitName = $"{kitId}_{carName}_liveries_modkit";
                 var all = (car?.Liveries.Where(l => l.YftPath != null).Select(l => new NewLiveryEntry(l.ModelName, l.Label ?? l.ModelName)) ?? Enumerable.Empty<NewLiveryEntry>())
                     .Concat(entries).GroupBy(e => e.ModelName, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).ToList();
@@ -446,6 +449,7 @@ namespace LiveryKit
             foreach (var l in job.Liveries)
             {
                 if (string.IsNullOrWhiteSpace(l.ImagePath) || !File.Exists(l.ImagePath)) throw new LiveryException($"Image not found: {l.ImagePath}");
+                ImageLoader.Load(l.ImagePath); // fail on an unreadable image before any livery is written
                 if (!string.IsNullOrEmpty(l.TemplatePath) && !File.Exists(l.TemplatePath)) throw new LiveryException($"Livery file not found: {l.TemplatePath}");
                 l.ModelName = (l.ModelName ?? "").Trim();
                 if (l.ModelName.EndsWith(".yft", StringComparison.OrdinalIgnoreCase)) l.ModelName = l.ModelName.Substring(0, l.ModelName.Length - 4);
@@ -458,7 +462,7 @@ namespace LiveryKit
                 l.Label = (l.Label ?? "").Trim();
                 if (job.LiteralLabels && l.Label.Length == 0) l.Label = string.IsNullOrWhiteSpace(l.DisplayName) ? l.ModelName : l.DisplayName.Trim();
                 if (l.Label.Length == 0) throw new LiveryException($"'{l.ModelName}' needs a mod shop label.");
-                if (!job.LiteralLabels && l.Label.Any(char.IsWhiteSpace)) throw new LiveryException($"The label '{l.Label}' can't contain spaces (put the readable name in Mod shop name).");
+                if (!job.LiteralLabels && !LiveryKit.Resources.Naming.IsValidModelName(l.Label)) throw new LiveryException($"The label '{l.Label}' can only use letters, numbers, _ and - (max 63). Put the readable name in Mod shop name.");
                 if (!labels.Add(l.Label)) throw new LiveryException($"Two liveries share the label '{l.Label}'.");
             }
             if (job.Mode == OutputMode.InstallIntoResource && job.Car == null)
@@ -534,6 +538,14 @@ namespace LiveryKit
         {
             foreach (var c in Path.GetInvalidFileNameChars()) s = s.Replace(c, '_');
             return s.Trim().Length == 0 ? "car" : s.Trim();
+        }
+
+        /// <summary>A random kit id from 4000-8999 that no scanned kit uses (stepping on from a taken one).</summary>
+        internal static string FreeKitId(ICollection<string> taken, Random rng)
+        {
+            int id = rng.Next(4000, 9000);
+            for (int i = 0; i < 5000 && taken.Contains(id.ToString()); i++) id = id == 8999 ? 4000 : id + 1;
+            return id.ToString();
         }
 
         static string UniqueFolder(string path)

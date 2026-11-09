@@ -180,6 +180,21 @@ namespace LiveryKit
                        && Ask("{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"1999-01-01\"}}").Contains("\"protocolVersion\":\"2025-11-25\"");
             });
 
+            Check("text entries: no backtracking hang on a run of backslashes, escapes still read", () =>
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                bool hit = TextEntries.Call.IsMatch("AddTextEntry(\"" + new string('\\', 60) + "x");
+                var e = TextEntries.Read("AddTextEntry(\"A_B\", \"He said \\\"hi\\\" \\\\ ok\")", null);
+                return !hit && sw.ElapsedMilliseconds < 500 && e.Count == 1 && e[0].Key == "A_B" && e[0].Value == "He said \"hi\" \\ ok";
+            });
+
+            Check("kit id: skips taken ids and wraps, else the random pick", () =>
+            {
+                var taken = new HashSet<string>(Enumerable.Range(4000, 4999).Select(i => i.ToString()));
+                return LiveryMaker.FreeKitId(taken, new Random(3)) == "8999"
+                       && LiveryMaker.FreeKitId(new HashSet<string>(), new Random(7)) == new Random(7).Next(4000, 9000).ToString();
+            });
+
             return results;
         }
     }

@@ -107,7 +107,7 @@ namespace LiveryKit.Meta
     public static class TextEntries
     {
         internal static readonly Regex Call = new Regex(
-            @"AddTextEntry\s*\(\s*(?<q1>['""])(?<key>(?:\\.|(?!\k<q1>).)*)\k<q1>\s*,\s*(?<q2>['""])(?<val>(?:\\.|(?!\k<q2>).)*)\k<q2>\s*\)",
+            @"AddTextEntry\s*\(\s*(?<q1>['""])(?<key>(?:\\.|(?!\k<q1>)[^\\])*)\k<q1>\s*,\s*(?<q2>['""])(?<val>(?:\\.|(?!\k<q2>)[^\\])*)\k<q2>\s*\)",
             RegexOptions.Compiled);
 
         public static bool HasEntries(string text) => text.IndexOf("AddTextEntry", StringComparison.Ordinal) >= 0;

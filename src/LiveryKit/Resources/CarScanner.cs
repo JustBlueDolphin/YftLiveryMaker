@@ -51,6 +51,7 @@ namespace LiveryKit.Resources
         public CarInfo Preferred { get; internal set; }
         public LiveryFile PreferredLivery { get; internal set; }
         public HashSet<string> AllYftNames { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> KitIds { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public List<string> Warnings { get; } = new List<string>();
     }
 
@@ -111,6 +112,7 @@ namespace LiveryKit.Resources
             var labelText = new Dictionary<string, TextEntry>(StringComparer.OrdinalIgnoreCase);
             foreach (var e in entries) labelText[e.Key] = e;
 
+            foreach (var kit in carcols) if (!string.IsNullOrEmpty(kit.KitId)) result.KitIds.Add(kit.KitId);
             var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             // Cars from mod kits that contain livery mods.

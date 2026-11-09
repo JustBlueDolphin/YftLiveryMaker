@@ -1030,7 +1030,7 @@ namespace YftLiveryMaker
             foreach (var p in paths)
             {
                 if (!ImageLoader.IsSupported(p)) { Log($"skipped {Path.GetFileName(p)}: not an image type the tool reads"); continue; }
-                var data = new Row { ImagePath = p, ImageName = UiHelpers.PrettyName(p) };
+                var data = new Row { ImagePath = p, ImageName = LiveryKit.LiveryMaker.PrettyName(p) };
                 if (replace != null && added.Count == 0)
                 {
                     // Taking over a livery another image already targets: that one goes back to "new".
@@ -1509,6 +1509,7 @@ namespace YftLiveryMaker
                 LiteralLabels = naming?.LiteralLabels ?? false,
                 TemplateLabel = naming?.TemplateLabel,
                 TakenYftNames = scan?.AllYftNames,
+                TakenKitIds = scan?.KitIds,
                 Texture = new TextureSettings
                 {
                     Format = SelectedFormat,

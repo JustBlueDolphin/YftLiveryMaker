@@ -69,14 +69,6 @@ namespace YftLiveryMaker
             return bmp;
         }
 
-        public static string PrettyName(string path)
-        {
-            var words = Path.GetFileNameWithoutExtension(path)
-                .Replace('_', ' ').Replace('-', ' ').Replace('.', ' ')
-                .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            return string.Join(" ", words.Select(w => char.ToUpperInvariant(w[0]) + w.Substring(1)));
-        }
-
         public static string Size(long bytes) =>
             bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024.0:0.0} MB" : $"{bytes / 1024.0:0} KB";
     }
